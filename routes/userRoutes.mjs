@@ -1,32 +1,61 @@
-import express from 'express'
-import User from '../models/userSchema.mjs'
-import Cart from '../models/cartSchema.mjs'
+import express from "express";
+import User from "../models/userSchema.mjs";
+import Cart from "../models/cartSchema.mjs";
 
-const router = express.Router()
+const router = express.Router();
 
+// @route: POST /api/user/register
+// @desc:  register user route
+// @access: Public
+router.post("/register", async (req, res) => {
+  //Destructure the req.body (opt)
+  const { username, email, password } = req.body;
 
-router.post('/register', async (req, res) => {
-    const {username, email, password} = (req.body);
-    if (!username || !email || !password) {
-        return res.status(400).json({msg: 'All fields are required.'})
-    }
+  // Check user submitted all necessary data, if not return
+  if (!username || !email || !password) {
+    return res.status(400).json({ msg: "All fields are required." });
+  }
 
-    const user = await User.findOne({email});
-    if(user) {
-        res.status(400).json({msg: 'Email already exist'})
-    }
+  // Check if user already exists
+  let user = await User.findOne({ email });
+  // If exists, return with error
+  if (user) {
+    return res.status(400).json({ msg: "Email Already Exists" });
+  }
 
-    user = new User({username, email, password})
-    await user.save();
+  // Create a new user, do not save to DB just yet
+  user = new User({ username, email, password });
 
-    const cart = new Cart({user: user._id, items: []})
-    await cart.save();
+  //Save user to create unique mongoDB _id
+  await user.save();
 
-    user.cart = cart._id
-    await user.save()
+  // Create users cart, pass in userID for user Property
+  const cart = new Cart({ user: user._id, items: [] });
+  // Save cart to DB, to create unique mongoDB _id for cart
+  await cart.save();
 
-    res.status(201).json({userId: user._id, cartId: cart._id});
-    
+  //update user with cart ID reference, and save
+  user.cart = cart._id;
+  await user.save();
+
+  res.status(201).json({ userId: user._id, cartId: cart._id });
+});
+
+router.post('/login', async (req, res) => {
+  const {email, password} = req.body
+
+  if(!email || !password) {
+    return res.status(400).json({msg: "All fields are required"})
+  };
+
+  let user = await User.findOne({email});
+  if(!user){
+    return res.status(400).json({msg:"Invalid credentials"})
+  }
+  if(password !== user.password){
+    return res.status(400).json({msg: "Invalid credentials"})
+  }
+  res.json({userId: user._id, cartId: user.cart})
 })
 
-export default router
+export default router;
